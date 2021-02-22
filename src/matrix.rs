@@ -81,12 +81,16 @@ impl Matrix {
         (a, b)
     }
 
-    pub fn relu(&self) -> Self {
+    pub fn relu(&self, alpha: f32) -> Self {
         let size_self = self.size();
         let mut result = Self::new(size_self);
         for i in 0..size_self.0 {
             for j in 0..size_self.1 {
-                result[i][j] = self[i][j].max(0.0);
+                if self[i][j] < 0.0 {
+                    result[i][j] = self[i][j] * alpha;
+                } else {
+                    result[i][j] = self[i][j]
+                }
             }
         }
         result
@@ -175,9 +179,11 @@ mod tests {
 
     #[test]
     fn test_relu() {
-        let m1 = Matrix::from_array(vec![1.0f32, -1.0]);
-        let expected = Matrix::from_array(vec![1.0f32, 0.0]);
-        let relu = m1.relu();
-        assert!(relu.approx_eq(&expected));
+        for alpha in [0.0f32, 0.1, 0.01].iter() {
+            let m1 = Matrix::from_array(vec![1.0f32, -1.0]);
+            let expected = Matrix::from_array(vec![1.0f32, -alpha]);
+            let relu = m1.relu(*alpha);
+            assert!(relu.approx_eq(&expected));
+        }
     }
 }

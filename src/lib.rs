@@ -18,8 +18,8 @@ pub struct FeeModel {
 
 impl FeeModel {
     pub fn new() -> FeeModel {
-        let low_model_bytes = include_bytes!("../models/20210217-142524/model.cbor");
-        let high_model_bytes = include_bytes!("../models/20210217-154050/model.cbor");
+        let low_model_bytes = include_bytes!("../models/20210221-220141/model.cbor");
+        let high_model_bytes = include_bytes!("../models/20210221-220251/model.cbor");
         let low =
             ModelData::from_reader(Cursor::new(low_model_bytes)).expect("checked at test time");
         let high =
@@ -83,34 +83,17 @@ impl FeeModel {
 mod tests {
     use crate::model_data::tests::BUCKETS;
     use crate::FeeModel;
-    use chrono::{NaiveDate, Utc};
 
     #[test]
     pub fn test_estimate() {
         let model = FeeModel::new();
-        let now = Utc::now().timestamp() as u32;
+        let ts = 1613939479u32;
         let one = model
-            .estimate_with_buckets(1, Some(now), &BUCKETS, now - 300)
+            .estimate_with_buckets(1, Some(ts), &BUCKETS, ts - 300)
             .unwrap();
         let two = model
-            .estimate_with_buckets(2, Some(now), &BUCKETS, now - 300)
+            .estimate_with_buckets(2, Some(ts), &BUCKETS, ts - 300)
             .unwrap();
         assert!(one > two, "1 block ({}) > 2 ({})", one, two);
-
-        let sunday = NaiveDate::from_ymd(2021, 2, 14)
-            .and_hms(12, 0, 0)
-            .timestamp() as u32;
-        let wednesday = NaiveDate::from_ymd(2021, 2, 17)
-            .and_hms(12, 0, 0)
-            .timestamp() as u32;
-        for i in [1u16, 2, 3, 6, 24, 144].iter() {
-            let wed = model
-                .estimate_with_buckets(*i, Some(sunday), &BUCKETS, sunday)
-                .unwrap();
-            let sun = model
-                .estimate_with_buckets(*i, Some(wednesday), &BUCKETS, wednesday)
-                .unwrap();
-            assert!(wed >= sun, "sunday ({}) > wednesday ({})", sun, wed);
-        }
     }
 }
