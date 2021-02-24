@@ -1,91 +1,100 @@
-use crate::Error;
-use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
+use std::marker::PhantomData;
+use std::ops::{Index, IndexMut};
 
-pub type Size = (usize, usize);
+pub mod size {
+    use super::SizeMarker;
+    use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Matrix(Vec<Vec<f32>>);
+    macro_rules! define_size {
+        ($name:ident, $size:expr) => {
+            #[derive(Debug, Serialize, Deserialize)]
+            pub enum $name {}
+            impl SizeMarker for $name {
+                fn size() -> usize {
+                    $size
+                }
+            }
+        };
+    }
 
-impl Deref for Matrix {
-    type Target = Vec<Vec<f32>>;
+    define_size!(Size1, 1);
+    define_size!(Size2, 2);
+    define_size!(Size4, 4);
+    define_size!(Size8, 8);
+    define_size!(Size16, 16);
+    define_size!(Size20, 20);
+    define_size!(Size32, 32);
+    define_size!(Size64, 64);
+    define_size!(Size128, 128);
+    define_size!(Size256, 256);
+    define_size!(Size512, 512);
+}
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+use size::*;
+
+pub trait SizeMarker: std::fmt::Debug {
+    fn size() -> usize;
+}
+
+#[derive(Debug)]
+pub struct Matrix<W, H>(Box<[f32]>, PhantomData<W>, PhantomData<H>);
+
+impl<W: SizeMarker, H: SizeMarker> Default for Matrix<W, H> {
+    fn default() -> Self {
+        let slice = vec![0.0; W::size() * H::size()].into_boxed_slice();
+
+        Matrix(slice, PhantomData, PhantomData)
     }
 }
 
-impl DerefMut for Matrix {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
+impl<W: SizeMarker, H: SizeMarker> Matrix<W, H> {
+    pub(crate) fn from_buffer(buf: Box<[f32]>) -> Self {
+        if buf.len() != W::size() * H::size() {
+            panic!("Invalid buffer size: expected {}, found {}", H::size() * W::size(), buf.len());
+        }
 
-impl Matrix {
-    pub fn new(size: Size) -> Self {
-        Matrix(vec![vec![0.0f32; size.1]; size.0])
+        Matrix(buf, PhantomData, PhantomData)
     }
 
-    pub fn _transpose(&self) -> Self {
-        let size = self.size();
-        let mut new = Self::new((size.1, size.0));
-        for i in 0..size.0 {
-            for k in 0..size.1 {
+    pub fn _transpose(&self) -> Matrix<H, W> {
+        let mut new = Matrix::<H, W>::default();
+        for i in 0..H::size() {
+            for k in 0..W::size() {
                 new[k][i] = self[i][k]
             }
         }
+
         new
     }
 
-    pub fn from_array(vec: Vec<f32>) -> Self {
-        Matrix(vec![vec])
-    }
-
-    pub fn dot(&self, other: &Self) -> Result<Self, Error> {
-        let size_self = self.size();
-        let size_other = other.size();
-        if size_self.1 != size_other.0 {
-            return Err(Error::IncompatibleDotMatrix(size_self, size_other));
-        }
-        let size_result = (size_self.0, size_other.1);
-        let mut result = Matrix::new(size_result);
-        for i in 0..size_result.0 {
-            for j in 0..size_result.1 {
-                let mut acc = 0.0f32;
-                for k in 0..size_self.1 {
-                    acc += self[i][k] * other[k][j];
-                }
-                result[i][j] = acc;
+    pub fn add(&self, other: &Self) -> Self {
+        let mut result = Self::default();
+        for i in 0..H::size() {
+            for k in 0..W::size() {
+                result[i][k] = self[i][k] + other[i][k]
             }
         }
 
-        Ok(result)
+        result
     }
 
-    pub fn add(&self, other: &[f32]) -> Result<Self, Error> {
-        let size_self = self.size();
-        let size_other = (1, other.len());
-        if size_self != size_other {
-            return Err(Error::IncompatibleAddMatrix(size_self, size_other));
+    pub fn dot<W2: SizeMarker>(&self, other: &Matrix<W2, W>) -> Matrix<W2, H> {
+        let mut result = Matrix::<W2, H>::default();
+        for i in 0..H::size() {
+            for j in 0..W2::size() {
+                for k in 0..W::size() {
+                    result[i][j] += self[i][k] * other[k][j];
+                }
+            }
         }
-        let mut result = Matrix::new(size_self);
-        for i in 0..size_self.1 {
-            result[0][i] = self[0][i] + other[i];
-        }
-        Ok(result)
-    }
 
-    pub fn size(&self) -> Size {
-        let a = self.len();
-        let b = if a > 0 { self[0].len() } else { 0 };
-        (a, b)
+        result
     }
 
     pub fn relu(&self, alpha: f32) -> Self {
-        let size_self = self.size();
-        let mut result = Self::new(size_self);
-        for i in 0..size_self.0 {
-            for j in 0..size_self.1 {
+        let mut result = Self::default();
+        for i in 0..H::size() {
+            for j in 0..W::size() {
                 if self[i][j] < 0.0 {
                     result[i][j] = self[i][j] * alpha;
                 } else {
@@ -93,25 +102,54 @@ impl Matrix {
                 }
             }
         }
+
         result
+    }
+}
+
+impl<W: SizeMarker> Matrix<W, Size1> {
+    pub fn from_array(arr: Box<[f32]>) -> Matrix<W, Size1> {
+        if arr.len() != W::size() {
+            panic!(
+                "Invalid array size: expected {}, found {}",
+                W::size(),
+                arr.len()
+            );
+        }
+
+        Matrix(arr, PhantomData, PhantomData)
+    }
+}
+
+impl<W: SizeMarker, H: SizeMarker> Index<usize> for Matrix<W, H> {
+    type Output = [f32];
+
+    fn index(&self, index: usize) -> &Self::Output {
+        let start = index * W::size();
+        let end = start + W::size();
+        &self.0[start..end]
+    }
+}
+
+impl<W: SizeMarker, H: SizeMarker> IndexMut<usize> for Matrix<W, H> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        let start = index * W::size();
+        let end = start + W::size();
+        &mut self.0[start..end]
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::matrix::Matrix;
+    use crate::matrix::{Matrix, Size1, Size2, SizeMarker};
     use crate::model_data::tests::get_test_model;
     use crate::model_data::tests::MARGIN;
     use float_cmp::{approx_eq, ApproxEq};
 
-    impl Matrix {
+    impl<W: SizeMarker, H: SizeMarker> Matrix<W, H> {
         pub fn approx_eq(&self, other: &Self) -> bool {
-            let self_size = self.size();
-            if self_size != other.size() {
-                return false;
-            }
-            for i in 0..self_size.0 {
-                for j in 0..self_size.1 {
+            for i in 0..H::size() {
+                for j in 0..W::size() {
                     if !self[i][j].approx_eq(other[i][j], MARGIN) {
                         return false;
                     }
@@ -123,27 +161,10 @@ mod tests {
     }
 
     #[test]
-    fn test_size() {
-        let model = get_test_model();
-        assert_eq!((20, 4), model.weights.l0_kernel.size());
-        assert_eq!((4, 4), model.weights.l1_kernel.size());
-        assert_eq!((4, 1), model.weights.l2_kernel.size());
-    }
-
-    #[test]
-    fn test_new() {
-        let size = (1, 20);
-        let m = Matrix::new(size);
-        assert_eq!(m.size(), size);
-    }
-
-    #[test]
     fn test_transpose() {
         let model = get_test_model();
-        assert_eq!((4, 20), model.weights.l0_kernel._transpose().size());
         let original = model.weights.l2_kernel;
         let transposed = original._transpose();
-        assert_eq!((1, 4), transposed.size());
         for i in 0..4 {
             assert!(approx_eq!(f32, original[i][0], transposed[0][i]));
         }
@@ -154,34 +175,29 @@ mod tests {
         let model = get_test_model();
         let a = model.weights.l2_kernel;
         let b = a._transpose();
-        assert!(a.dot(&a).is_err());
-        let result = a.dot(&b).unwrap();
+        let result = a.dot(&b);
         let mut acc = 0.0;
         for i in 0..4 {
             acc += a[i][0] * a[i][0];
         }
         approx_eq!(f32, result[0][0], acc);
 
-        let test = model
-            .weights
-            .l0_kernel
-            .dot(&model.weights.l1_kernel)
-            .unwrap();
-        assert_eq!(test.size(), (20, 4));
+        let _test = model.weights.l0_kernel.dot(&model.weights.l1_kernel);
     }
 
     #[test]
     fn test_add() {
-        let m1 = Matrix::from_array(vec![1.0f32]);
-        let result = m1.add(&vec![1.0f32]).unwrap();
+        let m1 = Matrix::<Size1, Size1>::from_array(vec![1.0f32].into_boxed_slice());
+        let m2 = Matrix::<Size1, Size1>::from_array(vec![1.0f32].into_boxed_slice());
+        let result = m1.add(&m2);
         assert!(approx_eq!(f32, 2.0f32, result[0][0]));
     }
 
     #[test]
     fn test_relu() {
         for alpha in [0.0f32, 0.1, 0.01].iter() {
-            let m1 = Matrix::from_array(vec![1.0f32, -1.0]);
-            let expected = Matrix::from_array(vec![1.0f32, -alpha]);
+            let m1 = Matrix::<Size2, Size1>::from_array(vec![1.0, -1.0].into_boxed_slice());
+            let expected = Matrix::<Size2, Size1>::from_array(vec![1.0, -alpha].into_boxed_slice());
             let relu = m1.relu(*alpha);
             assert!(relu.approx_eq(&expected));
         }

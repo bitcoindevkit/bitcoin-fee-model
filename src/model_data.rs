@@ -1,33 +1,48 @@
-use crate::matrix::Matrix;
+use crate::matrix::{size::*, Matrix, SizeMarker};
 use crate::Error;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{BufReader, Read};
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ModelData {
+#[derive(Deserialize, Debug)]
+pub struct ModelData<I, O, N> {
     pub norm: FieldsDescribe,
-    pub weights: Weights,
+    #[serde(bound(
+        deserialize = "N: SizeMarker + Deserialize<'de>, I: SizeMarker + Deserialize<'de>, O: SizeMarker + Deserialize<'de>"
+    ))]
+    pub weights: Weights<I, O, N, N>,
     pub fields: Vec<String>,
     pub alpha: f32,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Weights {
+#[derive(Deserialize, Debug)]
+pub struct Weights<I, O, N1, N2> {
     #[serde(rename = "dense/bias:0")]
-    pub l0_bias: Vec<f32>,
+    #[serde(bound(deserialize = "N1: SizeMarker + Deserialize<'de>"))]
+    pub l0_bias: Matrix<N1, Size1>,
     #[serde(rename = "dense/kernel:0")]
-    pub l0_kernel: Matrix,
+    #[serde(bound(
+        deserialize = "N1: SizeMarker + Deserialize<'de>, I: SizeMarker + Deserialize<'de>"
+    ))]
+    pub l0_kernel: Matrix<N1, I>,
 
     #[serde(rename = "dense_1/bias:0")]
-    pub l1_bias: Vec<f32>,
+    #[serde(bound(deserialize = "N2: SizeMarker + Deserialize<'de>"))]
+    pub l1_bias: Matrix<N2, Size1>,
     #[serde(rename = "dense_1/kernel:0")]
-    pub l1_kernel: Matrix,
+    #[serde(bound(
+        deserialize = "N2: SizeMarker + Deserialize<'de>, N1: SizeMarker + Deserialize<'de>"
+    ))]
+    pub l1_kernel: Matrix<N2, N1>,
 
     #[serde(rename = "dense_2/bias:0")]
-    pub l2_bias: Vec<f32>,
+    #[serde(bound(deserialize = "O: SizeMarker + Deserialize<'de>"))]
+    pub l2_bias: Matrix<O, Size1>,
     #[serde(rename = "dense_2/kernel:0")]
-    pub l2_kernel: Matrix,
+    #[serde(bound(
+        deserialize = "O: SizeMarker + Deserialize<'de>, N2: SizeMarker + Deserialize<'de>"
+    ))]
+    pub l2_kernel: Matrix<O, N2>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -36,29 +51,37 @@ pub struct FieldsDescribe {
     std: HashMap<String, f32>,
 }
 
-impl ModelData {
+impl<
+        'de,
+        I: SizeMarker + DeserializeOwned,
+        O: SizeMarker + DeserializeOwned,
+        N: SizeMarker + DeserializeOwned,
+    > ModelData<I, O, N>
+{
     pub fn from_reader<R: Read>(reader: R) -> Result<Self, Error> {
         let buffer = BufReader::new(reader);
         let model: Self = serde_cbor::from_reader(buffer)?;
         Ok(model)
     }
+}
 
-    pub fn predict(&self, input: &Matrix) -> Result<f32, Error> {
-        let a1 = input.dot(&self.weights.l0_kernel)?;
-        let a2 = a1.add(&self.weights.l0_bias)?;
+impl<I: SizeMarker, O: SizeMarker, N: SizeMarker> ModelData<I, O, N> {
+    pub fn predict(&self, input: &Matrix<I, Size1>) -> f32 {
+        let a1 = input.dot(&self.weights.l0_kernel);
+        let a2 = a1.add(&self.weights.l0_bias);
         let a3 = a2.relu(self.alpha);
 
-        let b1 = a3.dot(&self.weights.l1_kernel)?;
-        let b2 = b1.add(&self.weights.l1_bias)?;
+        let b1 = a3.dot(&self.weights.l1_kernel);
+        let b2 = b1.add(&self.weights.l1_bias);
         let b3 = b2.relu(self.alpha);
 
-        let c1 = b3.dot(&self.weights.l2_kernel)?;
-        let c2 = c1.add(&self.weights.l2_bias)?;
+        let c1 = b3.dot(&self.weights.l2_kernel);
+        let c2 = c1.add(&self.weights.l2_bias);
 
-        Ok(c2[0][0])
+        c2[0][0]
     }
 
-    pub fn norm(&self, input: &HashMap<String, f32>) -> Result<Matrix, Error> {
+    pub fn norm(&self, input: &HashMap<String, f32>) -> Result<Matrix<I, Size1>, Error> {
         let mut result = vec![];
         for field in self.fields.iter() {
             let x = input.get(field).unwrap_or(&0.0);
@@ -75,18 +98,18 @@ impl ModelData {
             let res = (x - mean) / std;
             result.push(res)
         }
-        Ok(Matrix::from_array(result))
+        Ok(Matrix::from_array(result.into_boxed_slice()))
     }
 
     pub fn norm_predict(&self, input: &HashMap<String, f32>) -> Result<f32, Error> {
         let input = self.norm(input)?;
-        self.predict(&input)
+        Ok(self.predict(&input))
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use crate::matrix::Matrix;
+    use crate::matrix::{size::*, Matrix};
     use crate::ModelData;
     use float_cmp::{ApproxEq, F32Margin};
     use std::collections::HashMap;
@@ -97,7 +120,7 @@ pub mod tests {
         epsilon: 0.0001,
     };
 
-    pub fn get_test_model() -> ModelData {
+    pub fn get_test_model() -> ModelData<Size20, Size1, Size4> {
         let model_bytes = include_bytes!("../models/test_model.cbor");
         assert_eq!(1799, model_bytes.len(), "test model bytes not expected");
         let model = ModelData::from_reader(Cursor::new(model_bytes));
@@ -106,11 +129,11 @@ pub mod tests {
     }
 
     #[rustfmt::skip]
-    pub fn get_test_input() -> Matrix {
+    pub fn get_test_input() -> Matrix<Size20, Size1> {
         Matrix::from_array(vec![-0.23901028,  0.02662498, -0.19410163,  0.03187769, -0.2026636,  -0.31123071,
                                      -0.23820148,  4.48084238,  0.86297716, -0.00825855, -0.1420311,  -0.5924509,
                                       0.62382793, -0.77146702, -0.5813809,  -0.36034099,  0.88637573,  0.3041703,
-                                      0.6286678,  -1.48856029])
+                                      0.6286678,  -1.48856029].into_boxed_slice())
     }
 
     pub const BUCKETS: [u64; 16] = [
@@ -137,32 +160,36 @@ pub mod tests {
     fn test_predict() {
         let model = get_test_model();
         let input = get_test_input();
-        assert!(get_test_result().approx_eq(model.predict(&input).unwrap(), MARGIN))
+        assert!(get_test_result().approx_eq(model.predict(&input), MARGIN))
     }
 
     #[test]
     fn test_vector() {
         let model = get_test_model();
         let input = get_test_input();
-        assert_eq!((1, 20), input.size());
 
-        let a1 = input.dot(&model.weights.l0_kernel).unwrap();
-        let a1_expected = Matrix::from_array(vec![-8.07738634, 0.32887421, 2.60496564, 0.14431801]);
+        let a1 = input.dot(&model.weights.l0_kernel);
+        let a1_expected = Matrix::from_array(
+            vec![-8.07738634, 0.32887421, 2.60496564, 0.14431801].into_boxed_slice(),
+        );
         assert!(a1.approx_eq(&a1_expected));
-        let a2 = a1.add(&model.weights.l0_bias).unwrap();
-        let a2_expected =
-            Matrix::from_array(vec![-9.79705103, 1.19654123, 2.06540848, -0.23819596]);
+        let a2 = a1.add(&model.weights.l0_bias);
+        let a2_expected = Matrix::from_array(
+            vec![-9.79705103, 1.19654123, 2.06540848, -0.23819596].into_boxed_slice(),
+        );
         assert!(a2.approx_eq(&a2_expected));
         let a3 = a2.relu(0.01);
 
-        let b1 = a3.dot(&model.weights.l1_kernel).unwrap();
-        let b2 = b1.add(&model.weights.l1_bias).unwrap();
+        let b1 = a3.dot(&model.weights.l1_kernel);
+        let b2 = b1.add(&model.weights.l1_bias);
         let b3 = b2.relu(0.01);
-        let b3_expected = Matrix::from_array(vec![-0.00769195, 4.21514198, 5.28356369, 5.090146]);
+        let b3_expected = Matrix::from_array(
+            vec![-0.00769195, 4.21514198, 5.28356369, 5.090146].into_boxed_slice(),
+        );
         assert!(b3.approx_eq(&b3_expected));
 
-        let c1 = b3.dot(&model.weights.l2_kernel).unwrap();
-        let c2 = c1.add(&model.weights.l2_bias).unwrap();
+        let c1 = b3.dot(&model.weights.l2_kernel);
+        let c2 = c1.add(&model.weights.l2_bias);
 
         assert!(get_test_result().approx_eq(c2[0][0], MARGIN))
     }

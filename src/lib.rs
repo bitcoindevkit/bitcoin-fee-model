@@ -1,4 +1,5 @@
 use crate::fee_bucket::FeeBuckets;
+use crate::matrix::size::*;
 use crate::model_data::ModelData;
 use chrono::{DateTime, Datelike, NaiveDateTime, Timelike, Utc};
 use std::collections::HashMap;
@@ -7,13 +8,14 @@ use std::io::Cursor;
 mod error;
 mod fee_bucket;
 mod matrix;
+mod matrix_serde;
 mod model_data;
 
 pub use error::Error;
 
 pub struct FeeModel {
-    low: ModelData,
-    high: ModelData,
+    low: ModelData<Size20, Size128, Size128>,
+    high: ModelData<Size20, Size128, Size128>,
 }
 
 impl FeeModel {
