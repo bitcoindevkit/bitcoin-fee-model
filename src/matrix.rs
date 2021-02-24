@@ -2,32 +2,7 @@ use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 
 pub mod size {
-    use super::SizeMarker;
-    use serde::{Deserialize, Serialize};
-
-    macro_rules! define_size {
-        ($name:ident, $size:expr) => {
-            #[derive(Debug, Serialize, Deserialize)]
-            pub enum $name {}
-            impl SizeMarker for $name {
-                fn size() -> usize {
-                    $size
-                }
-            }
-        };
-    }
-
-    define_size!(Size1, 1);
-    define_size!(Size2, 2);
-    define_size!(Size4, 4);
-    define_size!(Size8, 8);
-    define_size!(Size16, 16);
-    define_size!(Size20, 20);
-    define_size!(Size32, 32);
-    define_size!(Size64, 64);
-    define_size!(Size128, 128);
-    define_size!(Size256, 256);
-    define_size!(Size512, 512);
+    include!(concat!(env!("OUT_DIR"), "/sizes.rs"));
 }
 
 use size::*;
@@ -50,7 +25,11 @@ impl<W: SizeMarker, H: SizeMarker> Default for Matrix<W, H> {
 impl<W: SizeMarker, H: SizeMarker> Matrix<W, H> {
     pub(crate) fn from_buffer(buf: Box<[f32]>) -> Self {
         if buf.len() != W::size() * H::size() {
-            panic!("Invalid buffer size: expected {}, found {}", H::size() * W::size(), buf.len());
+            panic!(
+                "Invalid buffer size: expected {}, found {}",
+                H::size() * W::size(),
+                buf.len()
+            );
         }
 
         Matrix(buf, PhantomData, PhantomData)
@@ -141,7 +120,7 @@ impl<W: SizeMarker, H: SizeMarker> IndexMut<usize> for Matrix<W, H> {
 
 #[cfg(test)]
 mod tests {
-    use crate::matrix::{Matrix, Size1, Size2, SizeMarker};
+    use crate::matrix::{size::*, Matrix, SizeMarker};
     use crate::model_data::tests::get_test_model;
     use crate::model_data::tests::MARGIN;
     use float_cmp::{approx_eq, ApproxEq};

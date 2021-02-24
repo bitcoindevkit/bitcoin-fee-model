@@ -1,68 +1,39 @@
+use std::collections::HashMap;
+
 use crate::matrix::{size::*, Matrix, SizeMarker};
 use crate::Error;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::collections::HashMap;
-use std::io::{BufReader, Read};
 
-#[derive(Deserialize, Debug)]
+pub mod models {
+    use super::*;
+    use crate::matrix::Matrix;
+
+    include!(concat!(env!("OUT_DIR"), "/models.rs"));
+}
+
+#[derive(Debug)]
 pub struct ModelData<I, O, N> {
     pub norm: FieldsDescribe,
-    #[serde(bound(
-        deserialize = "N: SizeMarker + Deserialize<'de>, I: SizeMarker + Deserialize<'de>, O: SizeMarker + Deserialize<'de>"
-    ))]
     pub weights: Weights<I, O, N, N>,
     pub fields: Vec<String>,
     pub alpha: f32,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug)]
 pub struct Weights<I, O, N1, N2> {
-    #[serde(rename = "dense/bias:0")]
-    #[serde(bound(deserialize = "N1: SizeMarker + Deserialize<'de>"))]
     pub l0_bias: Matrix<N1, Size1>,
-    #[serde(rename = "dense/kernel:0")]
-    #[serde(bound(
-        deserialize = "N1: SizeMarker + Deserialize<'de>, I: SizeMarker + Deserialize<'de>"
-    ))]
     pub l0_kernel: Matrix<N1, I>,
 
-    #[serde(rename = "dense_1/bias:0")]
-    #[serde(bound(deserialize = "N2: SizeMarker + Deserialize<'de>"))]
     pub l1_bias: Matrix<N2, Size1>,
-    #[serde(rename = "dense_1/kernel:0")]
-    #[serde(bound(
-        deserialize = "N2: SizeMarker + Deserialize<'de>, N1: SizeMarker + Deserialize<'de>"
-    ))]
     pub l1_kernel: Matrix<N2, N1>,
 
-    #[serde(rename = "dense_2/bias:0")]
-    #[serde(bound(deserialize = "O: SizeMarker + Deserialize<'de>"))]
     pub l2_bias: Matrix<O, Size1>,
-    #[serde(rename = "dense_2/kernel:0")]
-    #[serde(bound(
-        deserialize = "O: SizeMarker + Deserialize<'de>, N2: SizeMarker + Deserialize<'de>"
-    ))]
     pub l2_kernel: Matrix<O, N2>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug)]
 pub struct FieldsDescribe {
     mean: HashMap<String, f32>,
     std: HashMap<String, f32>,
-}
-
-impl<
-        'de,
-        I: SizeMarker + DeserializeOwned,
-        O: SizeMarker + DeserializeOwned,
-        N: SizeMarker + DeserializeOwned,
-    > ModelData<I, O, N>
-{
-    pub fn from_reader<R: Read>(reader: R) -> Result<Self, Error> {
-        let buffer = BufReader::new(reader);
-        let model: Self = serde_cbor::from_reader(buffer)?;
-        Ok(model)
-    }
 }
 
 impl<I: SizeMarker, O: SizeMarker, N: SizeMarker> ModelData<I, O, N> {
@@ -109,11 +80,12 @@ impl<I: SizeMarker, O: SizeMarker, N: SizeMarker> ModelData<I, O, N> {
 
 #[cfg(test)]
 pub mod tests {
+    use std::collections::HashMap;
+
+    use float_cmp::{ApproxEq, F32Margin};
+
     use crate::matrix::{size::*, Matrix};
     use crate::ModelData;
-    use float_cmp::{ApproxEq, F32Margin};
-    use std::collections::HashMap;
-    use std::io::Cursor;
 
     pub const MARGIN: F32Margin = F32Margin {
         ulps: 2,
@@ -121,11 +93,7 @@ pub mod tests {
     };
 
     pub fn get_test_model() -> ModelData<Size20, Size1, Size4> {
-        let model_bytes = include_bytes!("../models/test_model.cbor");
-        assert_eq!(1799, model_bytes.len(), "test model bytes not expected");
-        let model = ModelData::from_reader(Cursor::new(model_bytes));
-        assert!(model.is_ok(), "can't restore model from bytes");
-        model.unwrap()
+        crate::get_model_test_model()
     }
 
     #[rustfmt::skip]
@@ -159,6 +127,7 @@ pub mod tests {
     #[test]
     fn test_predict() {
         let model = get_test_model();
+        dbg!(&model);
         let input = get_test_input();
         assert!(get_test_result().approx_eq(model.predict(&input), MARGIN))
     }

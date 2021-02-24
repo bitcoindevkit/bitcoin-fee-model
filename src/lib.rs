@@ -1,35 +1,33 @@
+use std::collections::HashMap;
+
+use chrono::{DateTime, Datelike, NaiveDateTime, Timelike, Utc};
+
 use crate::fee_bucket::FeeBuckets;
 use crate::matrix::size::*;
 use crate::model_data::ModelData;
-use chrono::{DateTime, Datelike, NaiveDateTime, Timelike, Utc};
-use std::collections::HashMap;
-use std::io::Cursor;
 
 mod error;
 mod fee_bucket;
 mod matrix;
-mod matrix_serde;
 mod model_data;
 
 pub use error::Error;
+pub use model_data::models::*;
 
 pub struct FeeModel {
-    low: ModelData<Size20, Size128, Size128>,
-    high: ModelData<Size20, Size128, Size128>,
+    low: ModelData<Size20, Size1, Size128>,
+    high: ModelData<Size20, Size1, Size128>,
 }
 
 impl FeeModel {
-    pub fn new() -> FeeModel {
-        let low_model_bytes = include_bytes!("../models/20210221-220141/model.cbor");
-        let high_model_bytes = include_bytes!("../models/20210221-220251/model.cbor");
-        let low =
-            ModelData::from_reader(Cursor::new(low_model_bytes)).expect("checked at test time");
-        let high =
-            ModelData::from_reader(Cursor::new(high_model_bytes)).expect("checked at test time");
+    pub fn new(
+        low: ModelData<Size20, Size1, Size128>,
+        high: ModelData<Size20, Size1, Size128>,
+    ) -> FeeModel {
         FeeModel { low, high }
     }
 
-    fn estimate_with_buckets(
+    pub fn estimate_with_buckets(
         &self,
         block_target: u16,
         timestamp: Option<u32>,
@@ -85,10 +83,11 @@ impl FeeModel {
 mod tests {
     use crate::model_data::tests::BUCKETS;
     use crate::FeeModel;
+    use crate::{get_model_high, get_model_low};
 
     #[test]
     pub fn test_estimate() {
-        let model = FeeModel::new();
+        let model = FeeModel::new(get_model_low(), get_model_high());
         let ts = 1613939479u32;
         let one = model
             .estimate_with_buckets(1, Some(ts), &BUCKETS, ts - 300)
