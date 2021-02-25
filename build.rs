@@ -185,6 +185,25 @@ fn add_model(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    const CUSTOM_FEE_ERR: &str = "Custom models must be specified with a comma separated list of `<name>:<path>`, with no space in between. Trailing commas are not supported";
+
+    let default_models = vec![
+        ("test_model", "./models/test_model.cbor"),
+        ("low", "./models/20210221-220141/model.cbor"),
+        ("high", "./models/20210221-220251/model.cbor"),
+    ];
+    let extra_models = option_env!("CUSTOM_FEE_MODELS")
+        .map(|s| s.split(','))
+        .map(|ps| {
+            ps.map(|p| p.split(':')).map(|mut p| {
+                (
+                    p.next().expect(CUSTOM_FEE_ERR),
+                    p.next().expect(CUSTOM_FEE_ERR),
+                )
+            })
+        })
+        .map(|s| s.collect::<Vec<_>>());
+
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let models_path = Path::new(&out_dir).join("models.rs");
     let sizes_path = Path::new(&out_dir).join("sizes.rs");
@@ -194,11 +213,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .collect::<HashSet<_>>();
     let mut models_file = File::create(models_path)?;
 
-    for (path, name) in vec![
-        ("./models/test_model.cbor", "test_model"),
-        ("./models/20210221-220141/model.cbor", "low"),
-        ("./models/20210221-220251/model.cbor", "high"),
-    ] {
+    for (name, path) in default_models
+        .into_iter()
+        .chain(extra_models.unwrap_or_default())
+    {
         let (req_sizes, content) = add_model(path, name)?;
 
         models_file.write_all(content.as_bytes())?;

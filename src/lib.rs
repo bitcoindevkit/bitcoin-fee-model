@@ -20,10 +20,7 @@ pub struct FeeModel<N> {
 }
 
 impl<N: SizeMarker> FeeModel<N> {
-    pub fn new(
-        low: ModelData<Size20, Size1, N>,
-        high: ModelData<Size20, Size1, N>,
-    ) -> FeeModel<N> {
+    pub fn new(low: ModelData<Size20, Size1, N>, high: ModelData<Size20, Size1, N>) -> FeeModel<N> {
         FeeModel { low, high }
     }
 
