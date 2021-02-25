@@ -15,7 +15,7 @@ pub struct ModelData {
 }
 
 impl ModelData {
-    fn into_src(&self, model_name: &str) -> (HashSet<usize>, String) {
+    fn into_src(self, model_name: &str) -> (HashSet<usize>, String) {
         let fields = self
             .fields
             .iter()
@@ -112,24 +112,51 @@ pub struct Weights {
     pub l2_kernel: Vec<Vec<f32>>,
 }
 
+fn compress_buffer(v: Vec<f32>) -> String {
+    let v_bytes = unsafe { std::slice::from_raw_parts(v.as_ptr() as *const u8, v.len() * 4) };
+    let s = v_bytes
+        .into_iter()
+        .map(|c| std::ascii::escape_default(*c))
+        .flatten()
+        .map(|c| char::from(c))
+        .collect::<String>();
+
+    format!("b\"{}\"", s)
+}
+
+fn decompress_buffer(data: String) -> String {
+    format!(
+        r#"{{
+        let data: Vec<u8> = {data}.to_vec();
+        let v_floats = unsafe {{ Vec::from_raw_parts(data.as_ptr() as *mut f32, data.len() / 4, data.len() / 4) }};
+
+        std::mem::forget(data);
+
+        v_floats
+    }}"#,
+        data = data
+    )
+}
+
 impl Weights {
-    fn into_src(&self) -> String {
-        fn serialize_vec(field_name: &str, v: &Vec<f32>) -> String {
+    fn into_src(self) -> String {
+        fn serialize_vec(field_name: &str, v: Vec<f32>) -> String {
             format!(
                 r#"
-                {field}: Matrix::from_buffer(vec!{data:?}.into_boxed_slice())
+                {field}: Matrix::from_buffer({data}.into_boxed_slice())
             "#,
                 field = field_name,
-                data = v
+                data = decompress_buffer(compress_buffer(v))
             )
         }
-        fn serialize_matrix(field_name: &str, v: &Vec<Vec<f32>>) -> String {
+        fn serialize_matrix(field_name: &str, v: Vec<Vec<f32>>) -> String {
             format!(
                 r#"
-                {field}: Matrix::from_buffer(vec!{data:?}.into_boxed_slice())
+                {field}: Matrix::from_buffer({data}.into_boxed_slice())
             "#,
                 field = field_name,
-                data = v.iter().flatten().collect::<Vec<_>>()
+                data =
+                    decompress_buffer(compress_buffer(v.into_iter().flatten().collect::<Vec<_>>()))
             )
         }
 
@@ -144,12 +171,12 @@ impl Weights {
                 {l2_kernel},
             }}
             "#,
-            l0_bias = serialize_vec("l0_bias", &self.l0_bias),
-            l0_kernel = serialize_matrix("l0_kernel", &self.l0_kernel),
-            l1_bias = serialize_vec("l1_bias", &self.l1_bias),
-            l1_kernel = serialize_matrix("l1_kernel", &self.l1_kernel),
-            l2_bias = serialize_vec("l2_bias", &self.l2_bias),
-            l2_kernel = serialize_matrix("l2_kernel", &self.l2_kernel),
+            l0_bias = serialize_vec("l0_bias", self.l0_bias),
+            l0_kernel = serialize_matrix("l0_kernel", self.l0_kernel),
+            l1_bias = serialize_vec("l1_bias", self.l1_bias),
+            l1_kernel = serialize_matrix("l1_kernel", self.l1_kernel),
+            l2_bias = serialize_vec("l2_bias", self.l2_bias),
+            l2_kernel = serialize_matrix("l2_kernel", self.l2_kernel),
         )
     }
 }
