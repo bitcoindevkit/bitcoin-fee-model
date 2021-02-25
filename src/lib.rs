@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Datelike, NaiveDateTime, Timelike, Utc};
 
 use crate::fee_bucket::FeeBuckets;
-use crate::matrix::size::*;
+use crate::matrix::{size::*, SizeMarker};
 use crate::model_data::ModelData;
 
 mod error;
@@ -14,16 +14,16 @@ mod model_data;
 pub use error::Error;
 pub use model_data::models::*;
 
-pub struct FeeModel {
-    low: ModelData<Size20, Size1, Size128>,
-    high: ModelData<Size20, Size1, Size128>,
+pub struct FeeModel<N> {
+    low: ModelData<Size20, Size1, N>,
+    high: ModelData<Size20, Size1, N>,
 }
 
-impl FeeModel {
+impl<N: SizeMarker> FeeModel<N> {
     pub fn new(
-        low: ModelData<Size20, Size1, Size128>,
-        high: ModelData<Size20, Size1, Size128>,
-    ) -> FeeModel {
+        low: ModelData<Size20, Size1, N>,
+        high: ModelData<Size20, Size1, N>,
+    ) -> FeeModel<N> {
         FeeModel { low, high }
     }
 
