@@ -8,7 +8,7 @@ pub const BUCKETS: [u64; 16] = [
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let model = FeeModel::new(get_model_low(), get_model_high());
 
-    let ts = 1613939479u32;
+    let ts = 1613708045u32;
     let one = model.estimate_with_buckets(1, Some(ts), &BUCKETS, ts - 300)?;
     let two = model.estimate_with_buckets(2, Some(ts), &BUCKETS, ts - 300)?;
 

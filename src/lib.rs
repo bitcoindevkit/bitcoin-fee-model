@@ -85,7 +85,7 @@ mod tests {
     #[test]
     pub fn test_estimate() {
         let model = FeeModel::new(get_model_low(), get_model_high());
-        let ts = 1613939479u32;
+        let ts = 1613708045u32;
         let one = model
             .estimate_with_buckets(1, Some(ts), &BUCKETS, ts - 300)
             .unwrap();
