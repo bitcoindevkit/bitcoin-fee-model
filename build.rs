@@ -39,7 +39,7 @@ impl ModelData {
         let req_sizes = vec![i_size, l0_size, o_size].into_iter().collect();
         let src = format!(
             r#"
-        pub fn get_model_{name}() -> ModelData<Size{i_size}, Size{o_size}, Size{n_size}> {{
+        pub fn get_model_{name}() -> ModelData<Size{i_size}, Size{n_size}, Size{o_size}> {{
             ModelData {{
                 norm: {norm},
                 weights: {weights},
@@ -160,14 +160,14 @@ fn emit_sizes_src(sizes: &HashSet<usize>) -> String {
         .map(|s| {
             format!(
                 r#"
-                                    #[derive(Debug)]
-                                                pub enum Size{s} {{}}
-                                                impl crate::matrix::SizeMarker for Size{s} {{
-                                                    fn size() -> usize {{
-                                                        {s}
-                                                    }}
-                                                }}
-                                 "#,
+                #[derive(Debug)]
+                pub enum Size{s} {{}}
+                impl crate::matrix::SizeMarker for Size{s} {{
+                    fn size() -> usize {{
+                        {s}
+                    }}
+                }}
+                "#,
                 s = s
             )
         })

@@ -11,7 +11,7 @@ pub mod models {
 }
 
 #[derive(Debug)]
-pub struct ModelData<I, O, N> {
+pub struct ModelData<I, N, O> {
     pub norm: FieldsDescribe,
     pub weights: Weights<I, O, N, N>,
     pub fields: Vec<String>,
@@ -36,7 +36,7 @@ pub struct FieldsDescribe {
     std: HashMap<String, f32>,
 }
 
-impl<I: SizeMarker, O: SizeMarker, N: SizeMarker> ModelData<I, O, N> {
+impl<I: SizeMarker, N: SizeMarker, O: SizeMarker> ModelData<I, N, O> {
     pub fn predict(&self, input: &Matrix<I, Size1>) -> f32 {
         let a1 = input.dot(&self.weights.l0_kernel);
         let a2 = a1.add(&self.weights.l0_bias);
@@ -92,7 +92,7 @@ pub mod tests {
         epsilon: 0.0001,
     };
 
-    pub fn get_test_model() -> ModelData<Size20, Size1, Size4> {
+    pub fn get_test_model() -> ModelData<Size20, Size4, Size1> {
         crate::get_model_test_model()
     }
 
