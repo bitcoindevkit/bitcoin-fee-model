@@ -4,6 +4,8 @@ use std::fmt;
 pub enum Error {
     MissingMeanData(String),
     MissingStdData(String),
+    UnconnectedBlocks,
+    LastTsMissing,
 }
 
 impl fmt::Display for Error {
@@ -11,6 +13,8 @@ impl fmt::Display for Error {
         match self {
             Error::MissingMeanData(s) => write!(f, "Missing mean field {} ", s),
             Error::MissingStdData(s) => write!(f, "Missing std field {} ", s),
+            Error::UnconnectedBlocks => write!(f, "Supplied blocks must be ordered and connected "),
+            Error::LastTsMissing => write!(f, "None of the 10 blocks is"),
         }
     }
 }

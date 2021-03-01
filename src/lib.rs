@@ -11,6 +11,15 @@ mod fee_bucket;
 mod matrix;
 mod model_data;
 
+#[cfg(feature = "use-bitcoin")]
+pub mod process_blocks;
+
+#[cfg(feature = "use-bitcoin")]
+pub extern crate bitcoin;
+
+#[cfg(feature = "use-bitcoin")]
+pub use process_blocks::process_blocks;
+
 pub use error::Error;
 pub use model_data::models::*;
 
