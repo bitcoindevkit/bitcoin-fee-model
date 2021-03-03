@@ -46,6 +46,7 @@ impl<W: SizeMarker, H: SizeMarker> Matrix<W, H> {
         new
     }
 
+    #[inline]
     pub fn add(&self, other: &Self) -> Self {
         let mut result = Self::default();
         for i in 0..H::size() {
@@ -57,6 +58,7 @@ impl<W: SizeMarker, H: SizeMarker> Matrix<W, H> {
         result
     }
 
+    #[inline]
     pub fn dot<W2: SizeMarker>(&self, other: &Matrix<W2, W>) -> Matrix<W2, H> {
         let mut result = Matrix::<W2, H>::default();
         for i in 0..H::size() {
@@ -70,6 +72,7 @@ impl<W: SizeMarker, H: SizeMarker> Matrix<W, H> {
         result
     }
 
+    #[inline]
     pub fn relu(&self, alpha: f32) -> Self {
         let mut result = Self::default();
         for i in 0..H::size() {
