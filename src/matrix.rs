@@ -61,9 +61,11 @@ impl<W: SizeMarker, H: SizeMarker> Matrix<W, H> {
         let mut result = Matrix::<W2, H>::default();
         for i in 0..H::size() {
             for j in 0..W2::size() {
+                let mut acc = 0.0;
                 for k in 0..W::size() {
-                    result[i][j] += self[i][k] * other[k][j];
+                    acc += self[i][k] * other[k][j];
                 }
+                result[i][j] = acc;
             }
         }
 
