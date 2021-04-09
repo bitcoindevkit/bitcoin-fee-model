@@ -124,20 +124,15 @@ impl<W: SizeMarker, H: SizeMarker> IndexMut<usize> for Matrix<W, H> {
 mod tests {
     use crate::matrix::{size::*, Matrix, SizeMarker};
     use crate::model_data::tests::get_test_model;
-    use crate::model_data::tests::MARGIN;
-    use float_cmp::{approx_eq, ApproxEq};
+    use crate::tests::assert_approx_eq;
 
     impl<W: SizeMarker, H: SizeMarker> Matrix<W, H> {
-        pub fn approx_eq(&self, other: &Self) -> bool {
+        pub fn assert_approx_eq(&self, other: &Self) {
             for i in 0..H::size() {
                 for j in 0..W::size() {
-                    if !self[i][j].approx_eq(other[i][j], MARGIN) {
-                        return false;
-                    }
+                    assert_approx_eq(self[i][j], other[i][j]);
                 }
             }
-
-            return true;
         }
     }
 
@@ -147,7 +142,7 @@ mod tests {
         let original = model.weights.l2_kernel;
         let transposed = original._transpose();
         for i in 0..4 {
-            assert!(approx_eq!(f32, original[i][0], transposed[0][i]));
+            assert_approx_eq(original[i][0], transposed[0][i])
         }
     }
 
@@ -156,12 +151,13 @@ mod tests {
         let model = get_test_model();
         let a = model.weights.l2_kernel;
         let b = a._transpose();
-        let result = a.dot(&b);
+        let result = b.dot(&a);
+
         let mut acc = 0.0;
         for i in 0..4 {
             acc += a[i][0] * a[i][0];
         }
-        approx_eq!(f32, result[0][0], acc);
+        assert_approx_eq(result[0][0], acc);
 
         let _test = model.weights.l0_kernel.dot(&model.weights.l1_kernel);
     }
@@ -171,7 +167,7 @@ mod tests {
         let m1 = Matrix::<Size1, Size1>::from_array(vec![1.0f32].into_boxed_slice());
         let m2 = Matrix::<Size1, Size1>::from_array(vec![1.0f32].into_boxed_slice());
         let result = m1.add(&m2);
-        assert!(approx_eq!(f32, 2.0f32, result[0][0]));
+        assert_approx_eq(2.0f32, result[0][0]);
     }
 
     #[test]
@@ -180,7 +176,7 @@ mod tests {
             let m1 = Matrix::<Size2, Size1>::from_array(vec![1.0, -1.0].into_boxed_slice());
             let expected = Matrix::<Size2, Size1>::from_array(vec![1.0, -alpha].into_boxed_slice());
             let relu = m1.relu(*alpha);
-            assert!(relu.approx_eq(&expected));
+            relu.assert_approx_eq(&expected);
         }
     }
 }

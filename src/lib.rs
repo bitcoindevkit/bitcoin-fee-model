@@ -94,6 +94,18 @@ mod tests {
     use serde::Deserialize;
     use std::collections::HashMap;
 
+    const EPS_1000: f32 = f32::EPSILON * 1000.0;
+
+    pub fn assert_approx_eq(a: f32, b: f32) {
+        let delta = (a - b).abs();
+        assert!(
+            delta < EPS_1000,
+            "diff is {} eps_1000 is {}",
+            delta,
+            EPS_1000
+        );
+    }
+
     #[test]
     pub fn test_estimate() {
         let model = FeeModel::new(get_model_low(), get_model_high());
@@ -134,16 +146,7 @@ mod tests {
         for (i, field) in model.fields.iter().enumerate() {
             input.insert(field.to_owned(), test.test_vector[i]);
         }
-        println!("{:?}", input);
         let result = model.norm_predict(&input).unwrap();
-
-        let delta = result - test.result;
-        let eps_1000 = f32::EPSILON * 1000.0;
-        assert!(
-            delta.abs() < (eps_1000),
-            "diff is {} eps_1000 is {}",
-            delta,
-            eps_1000
-        );
+        assert_approx_eq(result, test.result);
     }
 }

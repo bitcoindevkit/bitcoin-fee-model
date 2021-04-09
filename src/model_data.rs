@@ -82,15 +82,9 @@ impl<I: SizeMarker, N: SizeMarker, O: SizeMarker> ModelData<I, N, O> {
 pub mod tests {
     use std::collections::HashMap;
 
-    use float_cmp::{ApproxEq, F32Margin};
-
     use crate::matrix::{size::*, Matrix};
+    use crate::tests::assert_approx_eq;
     use crate::ModelData;
-
-    pub const MARGIN: F32Margin = F32Margin {
-        ulps: 2,
-        epsilon: 0.0001,
-    };
 
     pub fn get_test_model() -> ModelData<Size20, Size4, Size1> {
         crate::get_model_test_model()
@@ -127,9 +121,8 @@ pub mod tests {
     #[test]
     fn test_predict() {
         let model = get_test_model();
-        dbg!(&model);
         let input = get_test_input();
-        assert!(get_test_result().approx_eq(model.predict(&input), MARGIN))
+        assert_approx_eq(model.predict(&input), get_test_result())
     }
 
     #[test]
@@ -141,12 +134,12 @@ pub mod tests {
         let a1_expected = Matrix::from_array(
             vec![-8.07738634, 0.32887421, 2.60496564, 0.14431801].into_boxed_slice(),
         );
-        assert!(a1.approx_eq(&a1_expected));
+        a1.assert_approx_eq(&a1_expected);
         let a2 = a1.add(&model.weights.l0_bias);
         let a2_expected = Matrix::from_array(
             vec![-9.79705103, 1.19654123, 2.06540848, -0.23819596].into_boxed_slice(),
         );
-        assert!(a2.approx_eq(&a2_expected));
+        a2.assert_approx_eq(&a2_expected);
         let a3 = a2.relu(0.01);
 
         let b1 = a3.dot(&model.weights.l1_kernel);
@@ -155,12 +148,12 @@ pub mod tests {
         let b3_expected = Matrix::from_array(
             vec![-0.00769195, 4.21514198, 5.28356369, 5.090146].into_boxed_slice(),
         );
-        assert!(b3.approx_eq(&b3_expected));
+        b3.assert_approx_eq(&b3_expected);
 
         let c1 = b3.dot(&model.weights.l2_kernel);
         let c2 = c1.add(&model.weights.l2_bias);
 
-        assert!(get_test_result().approx_eq(c2[0][0], MARGIN))
+        assert_approx_eq(c2[0][0], get_test_result())
     }
 
     #[test]
@@ -169,6 +162,6 @@ pub mod tests {
         let model = get_test_model();
         let expected = get_test_input();
         let norm = model.norm(&get_test_pre_norm()).unwrap();
-        assert!(norm.approx_eq(&expected), "normalization is wrong");
+        norm.assert_approx_eq(&expected);
     }
 }
