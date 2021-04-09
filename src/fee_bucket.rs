@@ -15,7 +15,7 @@ impl FeeBuckets {
             let index = self
                 .buckets_limits
                 .iter()
-                .position(|e| e > &rate)
+                .position(|e| e > rate)
                 .unwrap_or(self.buckets_limits.len() - 1);
             buckets[index] += 1;
         }

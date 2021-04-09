@@ -52,7 +52,7 @@ impl ModelData {
             n_size = l0_size,
             o_size = o_size,
             name = model_name,
-            norm = self.norm.into_src(),
+            norm = self.norm.as_src(),
             weights = self.weights.into_src(),
             fields = fields,
             alpha = self.alpha
@@ -69,7 +69,7 @@ pub struct FieldsDescribe {
 }
 
 impl FieldsDescribe {
-    fn into_src(&self) -> String {
+    fn as_src(&self) -> String {
         let mean = self
             .mean
             .iter()
@@ -115,10 +115,10 @@ pub struct Weights {
 fn compress_buffer(v: Vec<f32>) -> String {
     let v_bytes = unsafe { std::slice::from_raw_parts(v.as_ptr() as *const u8, v.len() * 4) };
     let s = v_bytes
-        .into_iter()
+        .iter()
         .map(|c| std::ascii::escape_default(*c))
         .flatten()
-        .map(|c| char::from(c))
+        .map(char::from)
         .collect::<String>();
 
     format!("b\"{}\"", s)

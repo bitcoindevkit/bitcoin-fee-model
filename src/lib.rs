@@ -57,8 +57,8 @@ impl<N: SizeMarker> FeeModel<N> {
         let delta = utc.timestamp() - last_block_ts as i64;
         input.insert("delta_last".to_string(), delta as f32);
 
-        for i in 0..=15 {
-            input.insert(format!("b{}", i), fee_buckets[i] as f32);
+        for (i, fee_bucket) in fee_buckets.iter().take(16).enumerate() {
+            input.insert(format!("b{}", i), *fee_bucket as f32);
         }
 
         if block_target <= 2 {
