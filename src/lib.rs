@@ -88,8 +88,11 @@ impl<N: SizeMarker> FeeModel<N> {
 #[cfg(test)]
 mod tests {
     use crate::model_data::tests::BUCKETS;
-    use crate::FeeModel;
+    use crate::model_data::ModelData;
+    use crate::*;
     use crate::{get_model_high, get_model_low};
+    use serde::Deserialize;
+    use std::collections::HashMap;
 
     #[test]
     pub fn test_estimate() {
@@ -102,5 +105,45 @@ mod tests {
             .estimate_with_buckets(2, Some(ts), &BUCKETS, ts - 300)
             .unwrap();
         assert!(one > two, "1 block ({}) > 2 ({})", one, two);
+    }
+
+    #[derive(Deserialize)]
+    struct TestVector {
+        test_vector: Vec<f32>,
+        result: f32,
+    }
+
+    /// ensure the models are loaded correctly by using a test_vector created at the end of the training
+    /// for example ensure models are not swapped between high and low or parameters are swapped
+    #[test]
+    pub fn test_vector() {
+        // ensure the model is loaded correct
+        let model = FeeModel::new(get_model_low(), get_model_high());
+
+        let bytes_low = include_bytes!("../models/20210408-202241/test_vector.cbor");
+        let bytes_high = include_bytes!("../models/20210408-202237/test_vector.cbor");
+
+        test_single_vector(&model.low, bytes_low);
+        test_single_vector(&model.high, bytes_high);
+    }
+
+    fn test_single_vector(model: &ModelData<Size20, Size128, Size1>, bytes: &[u8]) {
+        let test: TestVector = serde_cbor::from_slice(&bytes[..]).unwrap();
+
+        let mut input = HashMap::new();
+        for (i, field) in model.fields.iter().enumerate() {
+            input.insert(field.to_owned(), test.test_vector[i]);
+        }
+        println!("{:?}", input);
+        let result = model.norm_predict(&input).unwrap();
+
+        let delta = result - test.result;
+        let eps_1000 = f32::EPSILON * 1000.0;
+        assert!(
+            delta.abs() < (eps_1000),
+            "diff is {} eps_1000 is {}",
+            delta,
+            eps_1000
+        );
     }
 }
