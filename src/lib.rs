@@ -24,7 +24,9 @@ pub use error::Error;
 pub use model_data::models::*;
 
 pub struct FeeModel<N> {
+    /// for 1,2 blocks
     low: ModelData<Size20, N, Size1>,
+    /// for 3-1008 blocks
     high: ModelData<Size20, N, Size1>,
 }
 
@@ -132,14 +134,14 @@ mod tests {
         // ensure the model is loaded correct
         let model = FeeModel::new(get_model_low(), get_model_high());
 
-        let bytes_low = include_bytes!("../models/20210408-202241/test_vector.cbor");
-        let bytes_high = include_bytes!("../models/20210408-202237/test_vector.cbor");
+        let bytes_low = include_bytes!("../models/20211027-180849/test_vector.cbor");
+        let bytes_high = include_bytes!("../models/20211027-180925/test_vector.cbor");
 
         test_single_vector(&model.low, bytes_low);
         test_single_vector(&model.high, bytes_high);
     }
 
-    fn test_single_vector(model: &ModelData<Size20, Size128, Size1>, bytes: &[u8]) {
+    fn test_single_vector(model: &ModelData<Size20, Size64, Size1>, bytes: &[u8]) {
         let test: TestVector = serde_cbor::from_slice(&bytes[..]).unwrap();
 
         let mut input = HashMap::new();

@@ -216,8 +216,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let default_models = vec![
         ("test_model", "./models/test_model.cbor"),
-        ("low", "./models/20210408-202241/model.cbor"),
-        ("high", "./models/20210408-202237/model.cbor"),
+        ("low", "./models/20211027-180849/model.cbor"), // for 1,2 blocks
+        ("high", "./models/20211027-180925/model.cbor"),
     ];
     let extra_models = option_env!("CUSTOM_FEE_MODELS")
         .map(|s| s.split(','))
