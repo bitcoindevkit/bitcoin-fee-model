@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Datelike, NaiveDateTime, Timelike, Utc};
 
 use crate::fee_bucket::FeeBuckets;
-use crate::matrix::{size::*, SizeMarker};
+pub use crate::matrix::{size::*, SizeMarker};
 use crate::model_data::ModelData;
 
 mod error;
