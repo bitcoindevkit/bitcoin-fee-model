@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 chrono = "0.4"
-bitcoin = { version = "^0.26", optional = true }
+bitcoin = { version = "^0.27", optional = true }
 
 [dev-dependencies]
 serde_cbor = "0.11"
